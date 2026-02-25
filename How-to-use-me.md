@@ -76,10 +76,12 @@ Once the player is powered on, the application automatically starts running netw
 4. Open `bs-player-netcheck-report.html` with any web browser
 5. The report will display all connectivity test results
 
+![alt text](./pics/host-connection-test.png)
+
 ### Generated Files
 
 When the tests run, the following files are created on the SD card:
-- **bs-player-netcheck-report.html**: The visual report (open with web browser)
+
 - **connectivity-test-results.json**: Raw test data in JSON format
 - **kernel.log**: System kernel log dump for technical diagnostics
 
