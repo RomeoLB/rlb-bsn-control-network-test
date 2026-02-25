@@ -5,6 +5,7 @@
 # But allow specific files and directories
 !.gitignore
 !How-to-use-me.md
+!bsn-netcheck-report.html
 !dist/autorun.brs
 !dist/bundle.js
 !dist/bs-player-netcheck-report.html
