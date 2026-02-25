@@ -8,6 +8,7 @@
 !dist/autorun.brs
 !dist/bundle.js
 !dist/bs-player-netcheck-report.html
+!dist/file-downloads-config.json
 !dist/
 !pics/
 !pics/**

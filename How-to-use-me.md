@@ -40,6 +40,7 @@ The BrightSign Network Check Report is a Node.js application that tests network 
   - `autorun.brs`
   - `bs-player-netcheck-report.html`
   - `bundle.js`
+- **Optional**: `file-downloads-config.json` (to customize file download tests)
 
 ### Installation Steps
 
@@ -152,6 +153,52 @@ Lists the 5 hosts with the highest maximum latency among all performed checks.
 ## Configuration
 
 The application comes pre-configured to test all BrightSign Cloud services. No additional configuration is required for normal use.
+
+### Customizing File Download Tests
+
+You can customize which files are tested for download by creating a `file-downloads-config.json` file. This is optional - if you don't create this file, the application will run without file download tests.
+
+**To customize file download tests:**
+
+1. **Create the Configuration File**: Create a new file named `file-downloads-config.json` using a text editor (like Notepad on Windows or TextEdit on Mac).
+
+2. **Add Download URLs**: The file should contain a JSON array with each download you want to test. Each download needs two properties:
+   - `url`: The full URL of the file to download
+   - `filename`: The name to save the file as on the SD card
+
+3. **Example Configuration**:
+   ```json
+   [
+     {
+       "url": "https://korbyt.com/prt/brightsign/autorun.zip",
+       "filename": "korbyt-autorun.zip"
+     },
+     {
+       "url": "https://downloads.appspace.com/devices/brightsign/packages/bsn/latest/autorun.zip",
+       "filename": "appspace-autorun.zip"
+     },
+     {
+       "url": "https://example.com/path/to/test.txt",
+       "filename": "test.txt"
+     }
+   ]
+   ```
+
+4. **Copy to SD Card**: Save the `file-downloads-config.json` file and copy it to the root of your SD card (same location as the other 3 files).
+
+5. **Test Results**: When the application runs, it will:
+   - Download each file listed in the configuration
+   - Measure download speed and latency
+   - Report success/failure for each download
+   - Display TLS certificate information for HTTPS URLs
+   - Save downloaded files to the SD card
+
+**Important Notes:**
+- The JSON format must be exact (watch for commas, quotes, and brackets)
+- Each URL should be a complete web address starting with `http://` or `https://`
+- You can add as many downloads as you want to test
+- If the config file has errors or is missing, the file download tests will be skipped
+- Downloaded test files are saved to the SD card but can be deleted if not needed
 
 
 ---
