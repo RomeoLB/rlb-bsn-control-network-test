@@ -1,0 +1,13 @@
+# Ignore everything by default
+*
+*/
+
+# But allow specific files and directories
+!.gitignore
+!How-to-use-me.md
+!dist/autorun.brs
+!dist/bundle.js
+!dist/bs-player-netcheck-report.html
+!dist/
+!pics/
+!pics/**
