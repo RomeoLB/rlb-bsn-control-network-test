@@ -38,9 +38,11 @@ The BrightSign Network Check Report is a Node.js application that tests network 
 - An SD card reader on your computer
 - The following 3 files:
   - `autorun.brs`
-  - `bs-player-netcheck-report.html`
+  - `bs-player-netcheck-report.html` (for player display)
   - `bundle.js`
-- **Optional**: `file-downloads-config.json` (to customize file download tests)
+- **Optional Files**:
+  - `file-downloads-config.json` (to customize file download tests)
+  - `bsn-netcheck-report.html` (desktop version for viewing test results from the player)
 
 ### Installation Steps
 
@@ -77,13 +79,18 @@ Once the player is powered on, the application automatically starts running netw
 4. Open `bs-player-netcheck-report.html` with any web browser
 5. The report will display all connectivity test results
 
+**Option 3: Use Desktop Version with File Upload** _(Advanced)_
+- Use `bsn-netcheck-report.html` on your desktop computer to view test results from the player
+- This version allows you to upload the `connectivity-test-results.json` file from the SD card
+- Useful for viewing test results from multiple players or analyzing results offline
+
 ![alt text](./pics/host-connection-test.png)
 
 ### Generated Files
 
 When the tests run, the following files are created on the SD card:
 
-- **connectivity-test-results.json**: Raw test data in JSON format
+- **connectivity-test-results.json**: Raw test data in JSON format (can be opened with `bsn-netcheck-report.html` on a desktop system)
 - **kernel.log**: System kernel log dump for technical diagnostics
 
 ---
@@ -224,11 +231,11 @@ Each host shows multiple test types:
 
 The application generates three files on your SD card:
 
-1. **bs-player-netcheck-report.html** - The main connectivity report (open with any web browser)
-2. **connectivity-test-results.json** - Raw test data in JSON format (human-readable text file with all test details)
+1. **bs-player-netcheck-report.html** - The main connectivity report displayed on the player (open with any web browser)
+2. **connectivity-test-results.json** - Raw test data in JSON format (human-readable text file with all test details; can be viewed using `bsn-netcheck-report.html` on a desktop system)
 3. **kernel.log** - System kernel log dump for technical diagnostics
 
-Simply open the HTML file with a web browser to view all your test results in an easy-to-read format.
+Simply open the HTML file with a web browser to view all your test results in an easy-to-read format. For viewing results from multiple players on your desktop computer, use `bsn-netcheck-report.html` which allows uploading JSON files from different test runs.
 
 ---
 
