@@ -79,13 +79,29 @@
       border-radius: 8px;
       overflow: hidden;
       box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      table-layout: fixed;
+      word-break: break-all;
     }
     th, td { 
       border: 1px solid #ddd; 
       padding: 0.75em 1em; 
       text-align: left;
       font-size: 0.9em;
+      vertical-align: top;
+      word-break: break-all;
+      white-space: pre-wrap;
+      max-width: 500px;
     }
+    td.host-status-col {
+      width: 120px;
+      min-width: 120px;
+      max-width: 120px;
+    }
+    td.checks-col {
+      width: 100%;
+      min-width: 350px;
+    }
+    
     th { 
       background: #667eea;
       color: white;
@@ -180,6 +196,38 @@
       const meta = report.metadata;
       const summary = report.summary;
       
+      // Gather all PKI failures across all checks and downloads
+      let allPKIFailures = [];
+      for (const host of report.results || []) {
+        for (const check of host.checks || []) {
+          if (check.detail && Array.isArray(check.detail.pki_failures) && check.detail.pki_failures.length > 0) {
+            allPKIFailures.push({ host: host.host, kind: check.kind, port: check.port, failures: check.detail.pki_failures });
+          }
+        }
+      }
+      for (const dl of (report.file_downloads || [])) {
+        if (dl.detail && Array.isArray(dl.detail.pki_failures) && dl.detail.pki_failures.length > 0) {
+          allPKIFailures.push({ url: dl.url, filename: dl.filename, failures: dl.detail.pki_failures });
+        }
+      }
+
+      // Build PKI summary if any failures
+      let pkiSummaryHtml = '';
+      if (allPKIFailures.length > 0) {
+        pkiSummaryHtml = `<div class="card" style="border-left: 6px solid #c0392b; background: #fff0f0;">
+          <h2 style="color:#c0392b;">⚠️ PKI Validation Issues Detected</h2>
+          <ul style="color:#c0392b;">
+            ${allPKIFailures.map(f => {
+              if (f.host) {
+                return `<li><b>${f.host}${f.port ? ':' + f.port : ''} (${f.kind})</b>: ${f.failures.map(e => `<span class='fail'>${e}</span>`).join(', ')}</li>`;
+              } else {
+                return `<li><b>File: ${f.filename}</b> (${f.url}): ${f.failures.map(e => `<span class='fail'>${e}</span>`).join(', ')}</li>`;
+              }
+            }).join('')}
+          </ul>
+        </div>`;
+      }
+
       // Build device info section
       let deviceInfo = '';
       if (meta.SN || meta.model || meta.OSversion) {
@@ -192,7 +240,7 @@
           </ul>
         `;
       }
-      
+
       // Build network info section
       let networkInfo = '';
       if (meta.eth0Info && meta.eth0Info.ipAddressList) {
@@ -207,7 +255,7 @@
           </ul>
         `;
       }
-      
+
       let pathValidationHtml = '';
       if (report.path_validation) {
         const pv = report.path_validation;
@@ -223,6 +271,7 @@
         `;
       }
       summaryDiv.innerHTML = `
+        ${pkiSummaryHtml}
         <h2>Test Summary</h2>
         <ul>
           <li><b>Started:</b> ${new Date(meta.started_at).toLocaleString()}</li>
@@ -247,14 +296,81 @@
       `;
       
       let html = `<h2>Host Connectivity Tests</h2><div class="card">`;
-      html += `<table><thead><tr><th>Host</th><th>Status</th><th>Checks</th></tr></thead><tbody>`;
+      html += `<table><thead><tr><th>Host & Status</th><th colspan="2">Checks</th></tr></thead><tbody>`;
       for (const host of report.results) {
+        // Special handling for ws.bsn.cloud: treat 401 as pass for WSS check
+        let checks = host.checks.map(check => {
+          if (
+            host.host === 'ws.bsn.cloud' &&
+            check.kind === 'wss' &&
+            check.detail &&
+            (check.detail.status === 401 || check.detail.status === '401')
+          ) {
+            return { ...check, ok: true };
+          }
+          return check;
+        });
         const status = host.ok ? '<span class="pass">PASS ✓</span>' : '<span class="fail">FAIL ✗</span>';
-        html += `<tr class="${host.ok ? 'pass' : 'fail'}"><td><b>${host.host}</b></td><td>${status}</td><td>`;
+        html += `<tr class="${host.ok ? 'pass' : 'fail'}"><td class="host-status-col" style="white-space:pre-line;"><b>${host.host}</b><br>${status}</td><td class="checks-col" colspan="2">`;
         html += '<table class="nested-table"><thead><tr><th>Type</th><th>Port</th><th>Status</th><th>Latency (ms)</th><th>Detail/Error</th></tr></thead><tbody>';
-        for (const check of host.checks) {
-          html += `<tr><td>${check.kind.toUpperCase()}</td><td>${check.port ?? '-'}</td><td>${check.ok ? '<span class="pass">✓</span>' : '<span class="fail">✗</span>'}</td><td><span class="latency">${check.latency_ms}</span></td><td>${check.ok ? (check.detail ? JSON.stringify(check.detail) : 'OK') : check.error}</td></tr>`;
+        let certInfoRows = '';
+        for (const check of checks) {
+          let detailHtml = '';
+          // Highlight PKI failures if present
+          if (check.detail && Array.isArray(check.detail.pki_failures) && check.detail.pki_failures.length > 0) {
+            detailHtml += `<div class='fail'><b>PKI Failures:</b> ${check.detail.pki_failures.map(e => `<span>${e}</span>`).join(', ')}</div>`;
+          }
+          if (check.ok && check.detail) {
+            // Show status code
+            if (typeof check.detail.status !== 'undefined') {
+              detailHtml += `<div><b>Status:</b> ${check.detail.status}</div>`;
+            }
+            // Show headers as table if present
+            if (check.detail.headers && typeof check.detail.headers === 'object' && Array.isArray(check.detail.headers) && check.detail.headers.length > 0) {
+              detailHtml += `<details><summary><b>Headers</b></summary><table class=\"nested-table\"><tbody>`;
+              for (const header of check.detail.headers) {
+                if (typeof header === 'string' && header.includes(':')) {
+                  const idx = header.indexOf(':');
+                  const key = header.slice(0, idx);
+                  const value = header.slice(idx + 1).trim();
+                  detailHtml += `<tr><td><b>${key}</b></td><td>${value}</td></tr>`;
+                } else {
+                  detailHtml += `<tr><td colspan=\"2\">${header}</td></tr>`;
+                }
+              }
+              detailHtml += `</tbody></table></details>`;
+            }
+            // Show any other fields
+            const skipFields = ['status', 'headers', 'certInfo', 'tls', 'cert_info', 'pki_failures'];
+            for (const key in check.detail) {
+              if (!skipFields.includes(key)) {
+                detailHtml += `<div><b>${key}:</b> ${typeof check.detail[key] === 'object' ? JSON.stringify(check.detail[key]) : check.detail[key]}</div>`;
+              }
+            }
+            if (!detailHtml) detailHtml = 'OK';
+          } else if (!check.ok) {
+            detailHtml = check.error;
+          } else {
+            detailHtml = 'OK';
+          }
+          html += `<tr><td>${check.kind.toUpperCase()}</td><td>${check.port ?? '-'}</td><td>${check.ok ? '<span class=\"pass\">✓</span>' : '<span class=\"fail\">✗</span>'}</td><td><span class=\"latency\">${check.latency_ms}</span></td><td colspan=\"2\">${detailHtml}</td></tr>`;
+          // Show cert_info in its own row below the check row (fallback to check.cert_info if missing in detail)
+          let certInfoToShow = (check.detail && check.detail.cert_info) ? check.detail.cert_info : (check.cert_info ? check.cert_info : null);
+          if (certInfoToShow) {
+            let certInfoHtml = '';
+            if (Array.isArray(certInfoToShow)) {
+              certInfoHtml = '<details open><summary><b>Certificate Chain</b></summary>';
+              certInfoToShow.forEach((cert, idx) => {
+                certInfoHtml += `<div style=\"margin-bottom:8px;\"><b>Cert #${idx+1}:</b><pre style=\"white-space:pre-wrap;word-break:break-all;max-width:100%;background:#f8f8f8;\">${JSON.stringify(cert, null, 2)}</pre></div>`;
+              });
+              certInfoHtml += '</details>';
+            } else {
+              certInfoHtml = `<details open><summary><b>Certificate Info</b></summary><pre style=\"white-space:pre-wrap;word-break:break-all;max-width:100%;background:#f8f8f8;\">${JSON.stringify(certInfoToShow, null, 2)}</pre></details>`;
+            }
+            certInfoRows += `<tr><td colspan=\"5\">${certInfoHtml}</td></tr>`;
+          }
         }
+        html += certInfoRows;
         html += '</tbody></table>';
         html += '</td></tr>';
       }
@@ -270,16 +386,42 @@
           const savedTo = dl.detail?.savedTo ?? 'N/A';
           const tlsIssuer = dl.detail?.tls_issuer ?? '-';
           const error = dl.ok ? '-' : dl.error;
-          html += `<div class="card table-responsive"><table><tbody>
-            <tr><th>URL</th><td>${dl.url}</td></tr>
+          let pkiHtml = '';
+          if (dl.detail && Array.isArray(dl.detail.pki_failures) && dl.detail.pki_failures.length > 0) {
+            pkiHtml = `<div class='fail'><b>PKI Failures:</b> ${dl.detail.pki_failures.map(e => `<span>${e}</span>`).join(', ')}</div>`;
+          }
+          let headersHtml = '';
+          if (dl.detail && dl.detail.headers && typeof dl.detail.headers === 'object') {
+            headersHtml += `<details><summary><b>Headers</b></summary><table class=\"nested-table\"><tbody>`;
+            for (const key in dl.detail.headers) {
+              headersHtml += `<tr><td style=\"color:#000;\"><b>${key}</b></td><td style=\"word-break:break-all;white-space:pre-wrap;color:#000;\">${dl.detail.headers[key]}</td></tr>`;
+            }
+            headersHtml += `</tbody></table></details>`;
+          }
+          let certHtml = '';
+          if (dl.detail && dl.detail.cert_info) {
+            if (Array.isArray(dl.detail.cert_info)) {
+              certHtml += '<details><summary><b>Certificate Chain</b></summary>';
+              dl.detail.cert_info.forEach((cert, idx) => {
+                certHtml += `<div style=\"margin-bottom:8px;\"><b>Cert #${idx+1}:</b><pre style=\"white-space:pre-wrap;word-break:break-all;max-width:100%;background:#f8f8f8;color:#000;\">${JSON.stringify(cert, null, 2)}</pre></div>`;
+              });
+              certHtml += '</details>';
+            } else {
+              certHtml += `<details><summary><b>Certificate Info</b></summary><pre style=\"white-space:pre-wrap;word-break:break-all;max-width:100%;background:#f8f8f8;color:#000;\">${JSON.stringify(dl.detail.cert_info, null, 2)}</pre></details>`;
+            }
+          }
+          html += `<div class=\"card table-responsive\"><table><tbody>
+            <tr><th>URL</th><td style=\"word-break:break-all;white-space:pre-wrap;\">${dl.url}</td></tr>
             <tr><th>Filename</th><td><b>${dl.filename}</b></td></tr>
             <tr><th>Result</th><td>${status}</td></tr>
             <tr><th>HTTP Status</th><td>${httpStatus}</td></tr>
-            <tr><th>Latency (ms)</th><td><span class="latency">${dl.latency_ms}</span></td></tr>
+            <tr><th>Latency (ms)</th><td><span class=\"latency\">${dl.latency_ms}</span></td></tr>
             <tr><th>Bytes Downloaded</th><td>${bytesDownloaded}</td></tr>
-            <tr><th>Saved To</th><td>${savedTo}</td></tr>
+            <tr><th>Saved To</th><td style=\"word-break:break-all;white-space:pre-wrap;\">${savedTo}</td></tr>
             <tr><th>TLS Issuer</th><td>${tlsIssuer}</td></tr>
-            <tr><th>Error</th><td>${error}</td></tr>
+            <tr><th>Error</th><td style=\"word-break:break-all;white-space:pre-wrap;\">${error}</td></tr>
+            <tr><th>PKI</th><td>${pkiHtml}</td></tr>
+            <tr><th colspan=\"2\">${headersHtml}${certHtml}</th></tr>
           </tbody></table></div>`;
         }
       }

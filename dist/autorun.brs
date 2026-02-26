@@ -1,16 +1,13 @@
-' 25/02/25 Test Standalone Load HTML widget and dump log - Debug Generic - RLB
+' 25/02/25 Test Standalone Load HTML widget run network test and dump log - Debug Generic - RLB
 
 Sub Main()
 
 	m.msgPort = CreateObject("roMessagePort")
 	b = CreateObject("roByteArray")
-	'b.FromHexString("ffffffff")
 	b.FromHexString("ff000000")
 	color_spec% = (255*256*256*256) + (b[1]*256*256) + (b[2]*256) + b[3]
 	videoMode = CreateObject("roVideoMode")
 	videoMode.SetBackgroundColor(color_spec%)
-	'videomode.Setmode("3840x2160x25p:gfxmemlarge")
-	'videomode.Setmode("3840x2160x60p:fullres")
 	videomode.Setmode("1920x1080x50p")
 	m.sTime = createObject("roSystemTime")
 	gpioPort = CreateObject("roControlPort", "BrightSign")
@@ -18,21 +15,17 @@ Sub Main()
 	m.SystemLog = CreateObject("roSystemLog")	
 	m.PluginInitHTMLWidgetStatic = PluginInitHTMLWidgetStatic
 	m.InitNodeJS = InitNodeJS
-	'm.StartFirstDumpTimer = StartFirstDumpTimer
 	m.loginURL = "file:///bs-player-netcheck-report.html"
 	m.FirstDumpTimerTimeout = 30
-
-
 
 	use_brightsign_media_player = "0"
 
 	ubmp_set = false
 	targetChromiumVersion_set = false
+	curl_set = false
+	wired_debug_set = false
 
-	'Non WorkingText flashing 
 	targetChromiumVersion = "chromium120"
-
-	'Working as expected
 	'targetChromiumVersion = "chromium87"
 
 	rs = createobject("roregistrysection", "html")
@@ -52,7 +45,24 @@ Sub Main()
 		print " @@@ widget_type set to targetChromiumVersion @@@ "
     end if
 
-	if ubmp_set = true or targetChromiumVersion_set = true then
+	rsNet = createobject("roregistrysection", "networking")
+    curl = rsNet.read("curl_debug")
+    if curl <> "1" then
+        rsNet.write("curl_debug", "1")
+        rsNet.flush()
+		curl_set = true
+		print " @@@ curl_debug set to 1 @@@ "
+    end if
+
+	wired_debug = rsNet.read("wired_debug")
+    if wired_debug <> "1" then
+        rsNet.write("wired_debug", "1")
+        rsNet.flush()
+		wired_debug_set = true
+		print " @@@ wired_debug set to 1 @@@ "
+    end if
+
+	if ubmp_set = true or targetChromiumVersion_set = true or curl_set = true or wired_debug_set = true then
 		print " @@@ Rebooting system to apply changes @@@ "
 		m.SystemLog.SendLine(" @@@ Rebooting system to apply changes @@@ ")
 		RebootSystem()
@@ -61,19 +71,15 @@ Sub Main()
 		m.SystemLog.SendLine(" @@@ No changes to registry settings @@@ ")
 	end if
 
-    'intialize audio output with initial value of 50
-    m.audioHDMIOutput = CreateObject("roAudioOutput", "HDMI")
-    m.audioAnalogOutput = CreateObject("roAudioOutput", "Analog")
-
-	audioRouting = {
-		mode: "prerouted"
-	}
-	m.audioConfiguration = CreateObject("roAudioConfiguration")
-	m.audioConfiguration.ConfigureAudio(audioRouting)
-
-	volume = 100
-	m.audioAnalogOutput.SetVolume(volume)
-    m.audioHDMIOutput.SetVolume(volume)
+	k = CreateObject("roKeystore")
+	ok = k.AddCACertificate("cert.pem")
+	
+	if ok then
+		m.SystemLog.SendLine("@@@ Self-Signed Cert SUCCESFULLY added to roKeyStore @@@")
+	else
+		Failure_Reason$ = k.GetFailureReason()
+		m.SystemLog.SendLine(" @@@ Failed to Add Cert to roKeyStore @@@ " + Failure_Reason$)
+	end if
 
 	StartInitNodeJSTimer()
 	StartFirstDumpTimer()
@@ -93,7 +99,6 @@ Sub Main()
 				
 			if type (m.InitNodeJSTimer) = "roTimer" then 
 				if m.InitNodeJSTimer.GetIdentity() = msg.GetSourceIdentity() then	
-					'm.PluginInitHTMLWidgetStatic()
 					m.InitNodeJS()
 				end if
 			end if
@@ -149,7 +154,6 @@ End Sub
 
 Function StartInitNodeJSTimer()
 	
-	print " Set Timer to load NodeJS instance..."
 	newTimeout = m.sTime.GetLocalDateTime()
 	newTimeout.AddSeconds(5)
 	m.InitNodeJSTimer = CreateObject("roTimer")
@@ -238,13 +242,10 @@ Function LogDump()
 		Chr3StartPos = instr(0, line, "<30>")
 
 		if Chr1StartPos > 0 then
-		
 			line = mid(line, Chr1StartPos + 4, LineLength - 3)
 		else if Chr2StartPos > 0 then
-
 			line = mid(line, Chr2StartPos + 4, LineLength - 3)
 		else if Chr3StartPos > 0 then
-
 			line = mid(line, Chr3StartPos + 4, LineLength - 3)	
 		end if		
 		
@@ -254,10 +255,9 @@ Function LogDump()
 	m.logFile.SendLine(currentLog)
 	m.logFile.Flush()	
 	
-	'sleep(10000)
 	m.SystemLog.SendLine(" @@@ Log file kernel_log.txt and connectivity-test-results.json should be available on SD card ... @@@ ")
 	print " @@@ Log file kernel_log.txt and connectivity-test-results.json should be available on SD card... @@@ "
-	'm.PluginInitHTMLWidgetStatic()
+
 	StartLoadHTMLWidgetTimer()
 End Function
 
@@ -265,8 +265,6 @@ End Function
 
 Function StartFirstDumpTimer()
 
-	print "StartFirstDumpTimer..."
-	
 	newTimeout = m.sTime.GetLocalDateTime()
 	newTimeout.AddSeconds(m.FirstDumpTimerTimeout)
 	m.FirstDumpTimer = CreateObject("roTimer")
@@ -278,8 +276,6 @@ End Function
 
 
 Function StartLoadHTMLWidgetTimer()
-
-	print "StartLoadHTMLWidgetTimer..."
 	
 	newTimeout = m.sTime.GetLocalDateTime()
 	newTimeout.AddSeconds(10)
