@@ -1,7 +1,8 @@
-' 25/02/25 Test Standalone Load HTML widget run network test and dump log - Debug Generic - RLB
+' 27/02/25 Test Standalone Load HTML widget run network test and dump log - Debug Generic - RLB
 'if proxy is enabled the node server is unable to serve local html page on Chromium 120
 'DWS password set to "romeo" to start pcap capture on eth0 for 100 seconds and save to file network-test-capture.pcap on SD card, 
 'which can be retrieved for analysis.
+'This test should last 100 seconds to allow enough time for the network test to complete and the pcap file and kernel log dump to be generated
 
 Sub Main()
 
