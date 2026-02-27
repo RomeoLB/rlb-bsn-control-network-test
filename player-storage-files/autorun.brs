@@ -1,5 +1,7 @@
 ' 25/02/25 Test Standalone Load HTML widget run network test and dump log - Debug Generic - RLB
 'if proxy is enabled the node server is unable to serve local html page on Chromium 120
+'DWS password set to "romeo" to start pcap capture on eth0 for 100 seconds and save to file network-test-capture.pcap on SD card, 
+'which can be retrieved for analysis.
 
 Sub Main()
 
@@ -20,6 +22,8 @@ Sub Main()
 	'proxy string with auth - "http://user:password@hostname:port"
 	' targetProxy$ = "http://144.124.227.90:21074"
 	targetProxy$ = ""
+
+	SetDWSwithPassword()
 
 	use_brightsign_media_player = "0"
 
@@ -105,33 +109,8 @@ Sub Main()
 
 	print " *** m.loginURL *** " m.loginURL
 
-	downloadList = []
-	m.xferList = {}
-	FileRead = ReadAsciiFile("brightscript-head-checks.json")
-	download_config = ParseJson(FileRead)
-	if download_config.count() > 0 then
-
-		index = 0
-		for each item in download_config
-
-			link = download_config[index].url
-			downloadList.push(link)
-			index$ = str(index)
-			formatIndex$ = mid(index$,2)
-			print " @@@ Added to download list @@@ : " + link
-			CheckEndpointAccess(link, "endpoint" + formatIndex$)
-			'stop
-			index = index + 1
-			sleep(5000)
-		next	
-	else
-		print " @@@ No file downloads configured or failed to read config file @@@ "
-	end if
-
-
 	StartInitNodeJSTimer()
 	StartFirstDumpTimer()
-
 
 	while true
 	    
@@ -186,6 +165,13 @@ Sub Main()
 					print "=== BS: Node.js instance exited with code " ; eventData.exit_code
 				else if eventData.reason = "message" then
 					print "=== BS: Received message "; eventData.message
+
+					if eventData.message.jsmsg <> invalid then
+						print "Message from Node.js: " + eventData.message.jsmsg
+						if eventData.message.jsmsg = "report_done" then
+							RunBrightscriptNetworkTest()
+						end if
+					end if
 					' To use this: msgPort.PostBSMessage({text: "my message"});
 					' if eventData.message.event <> invalid then
 					' end if
@@ -379,4 +365,49 @@ Function CheckEndpointAccess(link as String, positionName as String) as boolean
 	aa.method = "HEAD"
 	'aa.method = "GET"
 	m.xferList[positionName].AsyncMethod(aa)
+End Function
+
+
+
+Function RunBrightscriptNetworkTest()
+
+	downloadList = []
+	m.xferList = {}
+	FileRead = ReadAsciiFile("brightscript-head-checks.json")
+	download_config = ParseJson(FileRead)
+	if download_config.count() > 0 then
+
+		index = 0
+		for each item in download_config
+
+			link = download_config[index].url
+			downloadList.push(link)
+			index$ = str(index)
+			formatIndex$ = mid(index$,2)
+			print " @@@ Added to download list @@@ : " + link
+			CheckEndpointAccess(link, "endpoint" + formatIndex$)
+			'stop
+			index = index + 1
+			sleep(3000)
+		next	
+	else
+		print " @@@ No file downloads configured or failed to read config file @@@ "
+	end if
+End Function
+
+
+
+Function SetDWSwithPassword()
+
+	'password - romeo
+	obfuscatedPass$ = "A47ECD3014763B3B2CD4F6E1AD9CBEAE5A0AA6FCC98102B0990833067C2A6938C"
+	rs = createobject("roregistrysection", "networking")
+	dwsAA = CreateObject("roAssociativeArray")
+	dwsAA["port"] = "80" 
+	dwsAA["password"] = obfuscatedPass$
+	nc = CreateObject("roNetworkConfiguration", 0)
+	nc.SetupDWS(dwsAA)
+	ok = nc.Apply()
+
+	print "DWS Setup with romeo password"
 End Function

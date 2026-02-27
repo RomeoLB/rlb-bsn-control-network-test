@@ -47,6 +47,9 @@ You must copy the following 5 files (all found in the `player-storage-files` dir
 
 **Note:** These files are required for the application to function correctly on the player. Do not omit any of them.
 
+**Network Packet Capture for Troubleshooting:**
+This script is configured to set the DWS (Diagnostic Web Server) password to `romeo` so that a network packet capture can be initiated automatically for troubleshooting purposes. The application will attempt to trigger a diagnostic packet capture using this password when running on the player. If you change the DWS password on your device, update the script accordingly.
+
 **About `brightscript-head-checks.json`:**
 This file is used to test whether an endpoint is reachable using BrightScript's `roUrlTransfer` object. This method can gather additional information about the endpoint that may not be visible when testing the same endpoint via Node.js. It is especially useful for detecting network behaviors or restrictions that only affect BrightScript-level requests.
 
