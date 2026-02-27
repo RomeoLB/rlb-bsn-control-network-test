@@ -36,22 +36,31 @@ The BrightSign Network Check Report is a Node.js application that tests network 
 - A BrightSign media player
 - An SD card (minimum 4GB recommended)
 - An SD card reader on your computer
-- The following 3 files:
+
+You must copy the following 5 files (all found in the `player-storage-files` directory) to the root of the SD card:
+
   - `autorun.brs`
-  - `bs-player-netcheck-report.html` (for player display)
+  - `bs-player-netcheck-report.html`
   - `bundle.js`
-- **Optional Files**:
-  - `file-downloads-config.json` (to customize file download tests)
-  - `bsn-netcheck-report.html` (desktop version for viewing test results from the player)
+  - `file-downloads-config.json`
+  - `brightscript-head-checks.json`
+
+**Note:** These files are required for the application to function correctly on the player. Do not omit any of them.
+
+**About `brightscript-head-checks.json`:**
+This file is used to test whether an endpoint is reachable using BrightScript's `roUrlTransfer` object. This method can gather additional information about the endpoint that may not be visible when testing the same endpoint via Node.js. It is especially useful for detecting network behaviors or restrictions that only affect BrightScript-level requests.
+
+**Adding New Test URLs:**
+You can add new test URLs to both `brightscript-head-checks.json` and `file-downloads-config.json` to expand the set of endpoints being tested. Each file has its own format and purpose:
+- Add URLs to `brightscript-head-checks.json` to test with BrightScript/roUrlTransfer (for additional diagnostics).
+- Add URLs to `file-downloads-config.json` to test file downloads and endpoint reachability using Node.js.
 
 ### Installation Steps
 
 1. **Insert SD Card**: Insert your SD card into an SD card reader connected to your computer.
 
 2. **Copy Files**: Copy the 3 provided files to the root of the SD card:
-   - `autorun.brs`
-   - `bs-player-netcheck-report.html`
-   - `bundle.js`
+    Copy the 5 required files listed above to the root of the SD card.
 
 3. **Eject SD Card**: Safely eject the SD card from your computer.
 
