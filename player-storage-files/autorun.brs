@@ -1,4 +1,5 @@
 ' 25/02/25 Test Standalone Load HTML widget run network test and dump log - Debug Generic - RLB
+'if proxy is enabled the node server is unable to serve local html page on Chromium 120
 
 Sub Main()
 
@@ -15,8 +16,10 @@ Sub Main()
 	m.SystemLog = CreateObject("roSystemLog")	
 	m.PluginInitHTMLWidgetStatic = PluginInitHTMLWidgetStatic
 	m.InitNodeJS = InitNodeJS
-	m.loginURL = "file:///bs-player-netcheck-report.html"
 	m.FirstDumpTimerTimeout = 30
+	'proxy string with auth - "http://user:password@hostname:port"
+	' targetProxy$ = "http://144.124.227.90:21074"
+	targetProxy$ = ""
 
 	use_brightsign_media_player = "0"
 
@@ -25,8 +28,8 @@ Sub Main()
 	curl_set = false
 	wired_debug_set = false
 
-	targetChromiumVersion = "chromium120"
-	'targetChromiumVersion = "chromium87"
+	'targetChromiumVersion = "chromium120"
+	targetChromiumVersion = "chromium87"
 
 	rs = createobject("roregistrysection", "html")
     ubmp = rs.read("use-brightsign-media-player")
@@ -81,6 +84,48 @@ Sub Main()
 		m.SystemLog.SendLine(" @@@ Failed to Add Cert to roKeyStore @@@ " + Failure_Reason$)
 	end if
 
+	nc = CreateObject("roNetworkConfiguration",0)
+	nc.SetProxy(targetProxy$)
+	nc.Apply()
+
+
+	netconf = nc.GetCurrentConfig()
+	print " *** netconf *** " netconf
+	if netconf <> invalid then
+		if netconf.link = true AND netconf.ip4_address <> "" then
+			IP_OK = true
+			print " $$$ netconf.ip4_address $$$ " netconf.ip4_address
+		end if
+	end if		
+
+	m.loginURL = "http://" + netconf.ip4_address + ":3000/bs-player-netcheck-report.html"
+
+	print " *** m.loginURL *** " m.loginURL
+
+	downloadList = []
+	m.xferList = {}
+	FileRead = ReadAsciiFile("brightscript-head-checks.json")
+	download_config = ParseJson(FileRead)
+	if download_config.count() > 0 then
+
+		index = 0
+		for each item in download_config
+
+			link = download_config[index].url
+			downloadList.push(link)
+			index$ = str(index)
+			formatIndex$ = mid(index$,2)
+			print " @@@ Added to download list @@@ : " + link
+			CheckEndpointAccess(link, "endpoint" + formatIndex$)
+			'stop
+			index = index + 1
+			sleep(5000)
+		next	
+	else
+		print " @@@ No file downloads configured or failed to read config file @@@ "
+	end if
+
+
 	StartInitNodeJSTimer()
 	StartFirstDumpTimer()
 
@@ -123,6 +168,15 @@ Sub Main()
 				print " @@@ GPIO 12 pressed @@@  "
 				stop
 			end if
+		else if type(msg) = "roUrlEvent" then
+
+			print " @@@ msg.GetResponseCode() @@@ : " msg.GetResponseCode()
+			print " @@@ msg.GetFailureReason() @@@ : " msg.GetFailureReason()
+			print " @@@ msg.GetString() @@@ : " msg.GetString()	
+			'-28 is expected from WS test 
+
+			userData = msg.GetUserData()
+			print "roURLEvent UserData: "; userData
 	else if type(msg) = "roNodeJsEvent" then
 		print " @@@ roNodeJsEvent @@@ "
 		eventData = msg.GetData()
@@ -134,10 +188,6 @@ Sub Main()
 					print "=== BS: Received message "; eventData.message
 					' To use this: msgPort.PostBSMessage({text: "my message"});
 					' if eventData.message.event <> invalid then
-					' 	if eventData.message.event = "VIDEO_ENDED" then
-					' 		print "=== BS: roNodeJsEvent VIDEO_ENDED: "; 
-					' 		'm.PluginSendMessage("next")
-					' 	endif
 					' end if
 				else
 					print "======= UNHANDLED NODEJS EVENT ========="
@@ -303,4 +353,30 @@ Function Notify(message As String)
 	m.textWidget = CreateObject("roTextWidget", rectangle, 1, 2, textParameters)
 	m.textWidget.PushString(message)
 	m.textWidget.Show()
+End Function
+
+
+
+Function CheckEndpointAccess(link as String, positionName as String) as boolean
+
+	print " Check Endpoint Access..."; positionName
+
+	restRequestURL$ = link
+
+	posted = false
+
+	m.xferList[positionName] = CreateObject("roUrlTransfer")
+
+	userdata = {}
+    userdata.FunctionName = positionName
+
+	m.xferList[positionName].SetPort(m.msgPort)
+	m.xferList[positionName].SetUrl(restRequestURL$)
+	m.xferList[positionName].SetTimeout(2000)
+	m.xferList[positionName].SetUserData(userdata)
+
+	aa = { }
+	aa.method = "HEAD"
+	'aa.method = "GET"
+	m.xferList[positionName].AsyncMethod(aa)
 End Function

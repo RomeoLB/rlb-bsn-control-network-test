@@ -1,0 +1,42 @@
+[
+  {
+    "url": "https://services.brightsignnetwork.com"
+  },
+  {
+    "url": "https://crashes.brightsignnetwork.com"
+  },
+ {
+    "url": "https://firmware.bsn.cloud"
+  },
+ {
+    "url": "https://time.brightsignnetwork.com"
+  },
+ {
+    "url": "https://certs.brightsignnetwork.com"
+  },    
+ {
+    "url": "https://certs.bsn.cloud"
+  },
+ {
+    "url": "https://ws.bsn.cloud"
+  },
+ {
+    "url": "https://handlers.bsn.cloud"
+  },
+ {
+    "url": "https://provision.bsn.cloud"
+  },
+ {
+    "url": "https://provision.brightsignnetwork.com"
+  },
+ {
+    "url": "https://brightsign.biz"
+  },
+ {
+    "url": "https://downloads.appspace.com/devices/brightsign/packages/bsn/latest/autorun.zip"
+  },
+ {
+    "url": "https://korbyt.com/prt/brightsign/autorun.zip"
+  }
+
+]
