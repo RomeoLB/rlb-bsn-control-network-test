@@ -1,15 +1,27 @@
-# Ignore everything by default
-*
-*/
 
-# But allow specific files and directories
-!.gitignore
+
+
+
+# Ignore everything by default
+/*
+
+# Allow only these files at the repo root
 !How-to-use-me.md
-!bsn-netcheck-report.html
-!dist/autorun.brs
-!dist/bundle.js
-!dist/bs-player-netcheck-report.html
-!dist/file-downloads-config.json
-!dist/
-!pics/
-!pics/**
+
+
+# Un-ignore new folders
+!player-storage-files/
+!desktop-result-checker/
+
+# Allow only these files in player-storage-files/
+!player-storage-files/autorun.brs
+!player-storage-files/bs-player-netcheck-report.html
+!player-storage-files/bundle.js
+!player-storage-files/file-downloads-config.json
+!player-storage-files/brightscript-head-checks.json
+
+# Allow only this file in desktop-result-checker/
+!desktop-result-checker/bsn-netcheck-report.html
+
+# Always allow .gitignore itself
+!.gitignore
