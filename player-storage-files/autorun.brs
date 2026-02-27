@@ -88,6 +88,9 @@ Sub Main()
 	nc.SetProxy(targetProxy$)
 	nc.Apply()
 
+	m.SystemLog.SendLine(" @@@ Script for running network test and capturing kernel log... @@@ ")
+	print " @@@ Script for running network test and capturing kernel log... @@@ "
+	Notify(" Script for running network test and capturing kernel log..")	
 
 	netconf = nc.GetCurrentConfig()
 	print " *** netconf *** " netconf
@@ -129,9 +132,6 @@ Sub Main()
 	StartInitNodeJSTimer()
 	StartFirstDumpTimer()
 
-	m.SystemLog.SendLine(" @@@ Script for running network test and capturing kernel log... @@@ ")
-	print " @@@ Script for running network test and capturing kernel log... @@@ "
-	Notify(" Script for running network test and capturing kernel log..")	
 
 	while true
 	    
