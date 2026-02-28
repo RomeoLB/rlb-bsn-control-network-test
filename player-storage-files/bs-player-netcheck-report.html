@@ -153,6 +153,13 @@
     <div id="results"></div>
   </div>
   <script>
+    // Global error and promise rejection logging for debugging
+    window.addEventListener('error', function(event) {
+      console.error('Global error:', event.message, event.filename, event.lineno, event.colno, event.error);
+    });
+    window.addEventListener('unhandledrejection', function(event) {
+      console.error('Unhandled promise rejection:', event.reason);
+    });
     // Auto-load the JSON results from the server
     fetch('/connectivity-test-results.json')
       .then(r => r.json())
@@ -245,14 +252,15 @@
         ${pkiSummaryHtml}
         <h2>Test Summary</h2>
         <ul>
-          <li><b>Started:</b> ${new Date(meta.started_at).toLocaleString()}</li>
-          <li><b>Finished:</b> ${new Date(meta.finished_at).toLocaleString()}</li>
+          <li><b>Started:</b> ${new Date(meta.started_at).toLocaleString('en-GB')}</li>
+          <li><b>Finished:</b> ${new Date(meta.finished_at).toLocaleString('en-GB')}</li>
           <li><b>Platform:</b> ${meta.isBrightSign ? 'BrightSign' : meta.platform}</li>
           <li><b>Node.js:</b> ${meta.node}</li>
           <li><b>Timeout per check:</b> ${meta.timeout_ms} ms</li>
           <li><b>Total Hosts:</b> ${summary.total_hosts}</li>
           <li><b>Passing Hosts:</b> <span class="pass">${summary.pass_hosts} ✓</span></li>
           <li><b>Failing Hosts:</b> <span class="fail">${summary.fail_hosts} ✗</span></li>
+            <li><b>User Agent:</b> <span id="userAgent"></span></li>
         </ul>
         ${deviceInfo}
         ${networkInfo}
@@ -265,6 +273,9 @@
           </ol>
         </div>
       `;
+        // Set user agent value
+        const uaElem = document.getElementById('userAgent');
+        if (uaElem) uaElem.textContent = navigator.userAgent;
       
       let html = `<h2>Host Connectivity Tests</h2><div class="card">`;
       html += `<table><thead><tr><th>Host & Status</th><th colspan="2">Checks</th></tr></thead><tbody>`;

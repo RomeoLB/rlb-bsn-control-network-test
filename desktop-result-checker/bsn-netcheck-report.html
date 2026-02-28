@@ -274,8 +274,8 @@
         ${pkiSummaryHtml}
         <h2>Test Summary</h2>
         <ul>
-          <li><b>Started:</b> ${new Date(meta.started_at).toLocaleString()}</li>
-          <li><b>Finished:</b> ${new Date(meta.finished_at).toLocaleString()}</li>
+          <li><b>Started:</b> ${new Date(meta.started_at).toLocaleString('en-GB')}</li>
+          <li><b>Finished:</b> ${new Date(meta.finished_at).toLocaleString('en-GB')}</li>
           <li><b>Platform:</b> ${meta.isBrightSign ? 'BrightSign' : meta.platform}</li>
           <li><b>Node.js:</b> ${meta.node}</li>
           <li><b>Timeout per check:</b> ${meta.timeout_ms} ms</li>
