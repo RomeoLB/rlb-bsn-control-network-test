@@ -1,9 +1,11 @@
-' 27/02/25 Test Standalone Load HTML widget run network test and dump log - Debug Generic - RLB
+' 02/05/26 Test Standalone Load HTML widget run network test and dump log - Debug Generic - RLB
 'if proxy is enabled the node server is unable to serve local html page on Chromium 120
 'DWS password set to "romeo" to start pcap capture on eth0 for 100 seconds and save to file network-test-capture.pcap on player storage, 
 'which can be retrieved for analysis.
-'This test should last 100 seconds to allow enough time for the network test to complete and the pcap file and kernel log dump to be generated
 'test cert.pem should be place on root of storage
+'Ensuring that the test is ran on OS version 9.1.116 or higher for required node support version
+'fix rourltransfer WS test to properly set headers and timeout
+'Test running time is no longer harcoded and allows to still generate test result json even if the test takes up to 300 seconds on a slow network connection.
 
 Sub Main()
 
@@ -19,14 +21,18 @@ Sub Main()
 	gpioPort.SetPort(m.msgPort)
 	m.SystemLog = CreateObject("roSystemLog")	
 	m.PluginInitHTMLWidgetStatic = PluginInitHTMLWidgetStatic
-	m.CheckEndpointAccess = CheckEndpointAccess
+	m.CheckGETEndpointAccess = CheckGETEndpointAccess
+	m.CheckHEADEndpointAccess = CheckHEADEndpointAccess
+	m.CheckWSEndpointAccess = CheckWSEndpointAccess
 	m.InitNodeJS = InitNodeJS
-	m.FirstDumpTimerTimeout = 100
+	m.FirstDumpTimerTimeout = 15
 	m.Storage = GetDefaultDrive()
+	m.targetOSVersion = "9.1.116"
+	m.BSConnectivityTestResultsInfo = []
 	'proxy string with auth - "http://user:password@hostname:port"
 	' targetProxy$ = "http://144.124.227.90:21074" - public proxy for testing - not recommended for security reasons
 	targetProxy$ = ""
-	countdownValue = 100
+	countdownValue = 10
 
 	SetDWSwithPassword()
 
@@ -158,9 +164,19 @@ Sub Main()
 
 	print " *** m.loginURL *** " m.loginURL
 
-	StartInitNodeJSTimer()
-	StartFirstDumpTimer()
-	StartCountdown(countdownValue)
+	OS_OK = CheckOSVersion()
+
+	if OS_OK then
+		print "Device is eligible for running network tests - Starting Network Test..."
+		notify("Running Network Test... ")
+		StartInitNodeJSTimer()
+		'StartFirstDumpTimer()
+		'StartCountdown(countdownValue)
+	else	
+		print "Device is not eligible for running network tests - Skipping Network Test..."
+		m.SystemLog.SendLine("Device is not eligible for running network tests - Update to OS version " + m.targetOSVersion + " or higher to run network tests")
+		notify("Device is not eligible for running network tests - Update to OS version " + m.targetOSVersion + " or higher to run network tests")
+	end if	
 
 	while true
 	    
@@ -196,8 +212,14 @@ Sub Main()
 					link = m.downloadList[m.downloadIndex]
 					print " @@@ Added to download list @@@ : " + link
 					index$ = str(m.downloadIndex)
-					formatIndex$ = mid(index$,2)					
-					m.CheckEndpointAccess(link, "endpoint" + formatIndex$)
+					formatIndex$ = mid(index$,2)
+					if link = "https://ws.bsn.cloud" then 
+						m.CheckWSEndpointAccess(link, "endpoint" + formatIndex$)
+					else if link = "https://crashes.brightsignnetwork.com" then
+						m.CheckHEADEndpointAccess(link, "endpoint" + formatIndex$)
+					else
+						m.CheckGETEndpointAccess(link, "endpoint" + formatIndex$)
+					end if
 					m.downloadIndex = m.downloadIndex + 1
 					m.downloadTimer.SetElapsed(3, 0)
 					m.downloadTimer.Start()
@@ -219,6 +241,7 @@ Sub Main()
 			if type(m.LoadHtmlWidgetTimer) = "roTimer" then
 				if m.LoadHtmlWidgetTimer.GetIdentity() = msg.GetSourceIdentity() then
 					m.PluginInitHTMLWidgetStatic()
+					'StartFirstDumpTimer()
 				end if
 			end if	
 			if type(m.SnapshotDelayTimer) = "roTimer" then
@@ -246,14 +269,21 @@ Sub Main()
 
 			' print " @@@ msg.GetResponseCode() @@@ : " msg.GetResponseCode()
 			' print " @@@ msg.GetFailureReason() @@@ : " msg.GetFailureReason()
-			'-28 is expected from WS test 
 
 			userData = msg.GetUserData()
 
 			if userData.FunctionName <> invalid then
 				if instr(0, userData.FunctionName, "endpoint") then
-					m.SystemLog.SendLine(" @@@ roURLTransfer endpoint check for " + userData.Link + " completed with response code " + stri(msg.GetResponseCode()) + " and failure reason " + msg.GetFailureReason() + " @@@ ")
-					print " @@@ roURLTransfer endpoint check for " + userData.Link + " completed with response code " + stri(msg.GetResponseCode()) + " and failure reason " + msg.GetFailureReason() + " @@@ "
+					infostr = " @@@ roURLTransfer endpoint check for " + userData.Link + " completed with response code " + stri(msg.GetResponseCode()) + " and failure reason " + msg.GetFailureReason() + " @@@ "
+					m.SystemLog.SendLine(infostr)
+					print infostr
+					m.BSConnectivityTestResultsInfo.push({link: userData.Link, responseCode: msg.GetResponseCode(), failureReason: msg.GetFailureReason()})
+					if m.downloadIndex >= m.downloadList.Count() then
+						print " @@@ All endpoint checks completed @@@ "
+						m.SystemLog.SendLine(" @@@ All endpoint checks for Node and Brightscript completed @@@ ")
+						StartFirstDumpTimer()
+						m.node_js.PostJSMessage({bsmsg: "stop_capture"})
+					end if	
 				end if 	
 			end if	
 		else if type(msg) = "roNodeJsEvent" then
@@ -270,6 +300,7 @@ Sub Main()
 						print "Message from Node.js: " + eventData.message.jsmsg
 						if eventData.message.jsmsg = "report_done" then
 							RunBrightscriptNetworkTest()
+							'm.node_js.PostJSMessage({bsmsg: "my message"})
 						end if
 					end if
 					' To use this: msgPort.PostBSMessage({text: "my message"});
@@ -427,12 +458,22 @@ Function LogDump()
 		end if
 	next
 	
-	m.newFile.SendLine(currentLog)
-	m.newFile.Flush()	
-	
+	for each result in m.BSConnectivityTestResultsInfo
+		if instr(0,stri(result.responseCode), "200") or instr(0,stri(result.responseCode), "403") or instr(0,stri(result.responseCode), "404") or instr(0,stri(result.responseCode), "401") or instr(0,stri(result.responseCode), "500") or instr(0,stri(result.responseCode), "502") then
+			resultLine = "@@@ roURLTransfer Endpoint Test: " + result.link + " | Response Code: " + stri(result.responseCode) + " | SUCCESS"
+		else
+			resultLine = "@@@ roURLTransfer Endpoint Test: " + result.link + " | Response Code: " + stri(result.responseCode) + " | Failure Reason: " + result.failureReason
+		end if
+		'm.SystemLog.SendLine(resultLine)
+		currentLog = currentLog + resultLine + chr(13) + chr(10)
+	next	
+
+
+
 	m.SystemLog.SendLine(" @@@ Log file kernel_log.txt and connectivity-test-results.json should be available on player storage ... @@@ ")
 	print " @@@ Log file kernel_log.txt and connectivity-test-results.json should be available on player storage... @@@ "
-
+	m.newFile.SendLine(currentLog)
+	m.newFile.Flush()
 	StartLoadHTMLWidgetTimer()
 End Function
 
@@ -461,6 +502,7 @@ Function StartLoadHTMLWidgetTimer()
 End Function
 
 
+
 Function StartSnapshotDelayTimer()
 	
 	newTimeout = m.sTime.GetLocalDateTime()
@@ -470,6 +512,7 @@ Function StartSnapshotDelayTimer()
 	m.SnapshotDelayTimer.SetDateTime(newTimeout)
 	m.SnapshotDelayTimer.Start()
 End Function
+
 
 
 Function StartCountdown(seconds as Integer)
@@ -516,7 +559,8 @@ Function InitCountdownTextWidget()
 End Function
 
 
-Function CheckEndpointAccess(link as String, positionName as String) as boolean
+
+Function CheckGETEndpointAccess(link as String, positionName as String) as boolean
 
 	print " Check Endpoint Access..."; positionName
 
@@ -532,7 +576,7 @@ Function CheckEndpointAccess(link as String, positionName as String) as boolean
 
 	m.xferList[positionName].SetPort(m.msgPort)
 	m.xferList[positionName].SetUrl(restRequestURL$)
-	m.xferList[positionName].SetTimeout(2000)
+	m.xferList[positionName].SetTimeout(6000)
 	m.xferList[positionName].SetUserData(userdata)
 
 	aa = { }
@@ -543,31 +587,57 @@ End Function
 
 
 
-' Function RunBrightscriptNetworkTest()
+Function CheckHEADEndpointAccess(link as String, positionName as String) as boolean
 
-' 	downloadList = []
-' 	m.xferList = {}
-' 	FileRead = ReadAsciiFile("brightscript-head-checks.json")
-' 	download_config = ParseJson(FileRead)
-' 	if download_config.count() > 0 then
+	restRequestURL$ = link
 
-' 		index = 0
-' 		for each item in download_config
+	posted = false
 
-' 			link = download_config[index].url
-' 			downloadList.push(link)
-' 			index$ = str(index)
-' 			formatIndex$ = mid(index$,2)
-' 			print " @@@ Added to download list @@@ : " + link
-' 			CheckEndpointAccess(link, "endpoint" + formatIndex$)
-' 			'stop
-' 			index = index + 1
-' 			sleep(3000)
-' 		next	
-' 	else
-' 		print " @@@ No file downloads configured or failed to read config file @@@ "
-' 	end if
-' End Function
+	m.xferList[positionName] = CreateObject("roUrlTransfer")
+
+	userdata = {}
+	userdata.FunctionName = positionName
+	userdata.Link = link
+
+	m.xferList[positionName].SetPort(m.msgPort)
+	m.xferList[positionName].SetUrl(restRequestURL$)
+	m.xferList[positionName].SetTimeout(6000)
+	m.xferList[positionName].SetUserData(userdata)
+
+	aa = { }
+	aa.method = "HEAD"
+	'aa.method = "GET"
+	m.xferList[positionName].AsyncMethod(aa)
+End Function
+
+
+
+Function CheckWSEndpointAccess(link as String, positionName as String) as boolean
+
+	restRequestURL$ = link
+
+	posted = false
+
+	m.xferList[positionName] = CreateObject("roUrlTransfer")
+
+	userdata = {}
+	userdata.FunctionName = positionName
+	userdata.Link = link
+
+	m.xferList[positionName].SetPort(m.msgPort)
+	m.xferList[positionName].SetUrl(restRequestURL$)
+	m.xferList[positionName].SetTimeout(6000)
+	m.xferList[positionName].SetUserData(userdata)
+    m.xferList[positionName].AddHeader("Connection", "Upgrade")
+    m.xferList[positionName].AddHeader("Upgrade", "websocket")
+    m.xferList[positionName].AddHeader("Sec-WebSocket-Version", "13")
+
+	aa = { }
+	'aa.method = "HEAD"
+	aa.method = "GET"
+	m.xferList[positionName].AsyncMethod(aa)
+End Function
+
 
 
 Function RunBrightscriptNetworkTest()
@@ -632,4 +702,27 @@ Function TakeScreenshot()
 	else
 		status = "false"
 	end if 
+End Function
+
+
+
+Function CheckOSVersion()As Boolean
+
+    'm.targetOSVersion = "9.1.116"
+    isTargetVersion = false
+
+    modelObject = CreateObject("roDeviceInfo")
+
+    version = modelObject.GetVersion()
+    print "Device OS Version: "; version
+
+    isTargetVersion = modelObject.FirmwareIsAtLeast(m.targetOSVersion)
+    'returns true
+
+    if isTargetVersion then
+        print "Device OS version is at least "; m.targetOSVersion; " - Starting Network Test..."
+    else 
+		print "Device is not eligible for running network tests - Not starting Network Test..."
+    end if 
+	return isTargetVersion   
 End Function
